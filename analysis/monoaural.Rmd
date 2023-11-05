@@ -1,0 +1,178 @@
+---
+title: "monaural_plots"
+author: "Brosig Borbála"
+date: "2023-11-05"
+output: html_document
+---
+
+
+## Setup
+
+```{r setup}
+library(openxlsx)
+library(readxl)
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(yhat)
+library(quantreg)
+library(lme4)
+library(lmerTest)
+library(ggpubr)
+library(rstatix)
+```
+
+```{r}
+monoaural_data <- read.xlsx("../data/stim_monoaural_logfiles_szelektalt.xlsx")
+
+monoaural_long <- monoaural_data %>% 
+  pivot_longer(!c(Resztvevok, eletkor, nem), names_to = "subcat", values_to = "RT") %>% 
+  filter(subcat %in% c("ertelmetlen-1", "mn-1", "szsz-1", "ertelmetlen-2", "mn-2", "szsz-2"))
+
+glimpse(monoaural_long)
+
+monoaural_long %>% 
+ggplot(aes(x=subcat, y=RT, fill =subcat)) +
+  geom_boxplot() +
+  geom_point(alpha = 0.1, position = "jitter")+
+  labs(title = "Reakcióidő nagysága a feltételek közt", y= "Reakcióidő", x = "Alkategóriák")+
+  scale_fill_manual(values = c("#BDEDE0", "#BBDBD1", "#B6B8D6", "#7E78D2", "#A7AAA4", "#9899A6"))+
+  scale_x_discrete(labels=c('Értelmetlen, Bal', 'Értelmetlen, Jobb', 'Metaforikus, Bal', 'Metaforikus, Jobb', 'Konkrét, Bal', 'Konkrét, Jobb'))+
+  theme_minimal() + 
+  theme(axis.text.x = element_text(angle = 90),
+        plot.title=element_text(hjust = 0.5),
+        legend.position = "none",
+        plot.background = element_rect(fill = "transparent", color = NA),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank())
+ggsave("../figures/001-boxplot-conditions.jpg",  width = 20, height = 20, units = "cm", dpi = 900)
+
+
+monoaural_long %>% 
+ggplot(aes(x=subcat, y=RT, fill =subcat)) +
+  geom_violin() +
+  geom_point(alpha = 0.1, position = "jitter")+
+  geom_boxplot(width=0.1, fill = 'white')+
+  labs(title = "Reakcióidő nagysága a feltételek közt", y= "Reakcióidő", x = "Alkategóriák")+
+  scale_fill_manual(values = c("#BDEDE0", "#BBDBD1", "#B6B8D6", "#7E78D2", "#A7AAA4", "#9899A6"))+
+  scale_x_discrete(labels=c('Értelmetlen, Bal', 'Értelmetlen, Jobb', 'Metaforikus, Bal', 'Metaforikus, Jobb', 'Konkrét, Bal', 'Konkrét, Jobb'))+
+  theme_minimal() + 
+  theme(axis.text.x = element_text(angle = 90),
+        plot.title=element_text(hjust = 0.5),
+        legend.position = "none",
+        plot.background = element_rect(fill = "transparent", color = NA),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank())
+ggsave("../figures/001-violinplot-conditions.jpg",  width = 20, height = 20, units = "cm", dpi = 900)
+```
+
+```{r}
+
+glimpse(monoaural_long)
+
+monoaural_long %>%
+  ggplot()+
+  geom_line(aes(x = subcat, y = RT, group = Resztvevok, color = as.factor(Resztvevok)))+
+  labs(title = "Reakcióidő nagysága a feltételek közt egyes résztvevőknél", y= "Reakcióidő", x = "Alkategóriák")+
+  scale_x_discrete(labels=c('Értelmetlen, Bal', 'Értelmetlen, Jobb', 'Metaforikus, Bal', 'Metaforikus, Jobb', 'Konkrét, Bal', 'Konkrét, Jobb'))+
+  theme_minimal() + 
+  theme(axis.text.x = element_text(angle = 90),
+        plot.title=element_text(hjust = 0.5),
+        legend.position = "none",
+        plot.background = element_rect(fill = "transparent", color = NA),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank())
+ggsave("../figures/001-linechart.jpg",  width = 20, height = 20, units = "cm", dpi = 900)
+  
+
+```
+
+
+
+```{r}
+monoaural_longer <- monoaural_long %>% 
+  filter(!subcat %in% c("ertelmetlen", "mn", "szsz")) %>% 
+  separate(subcat, c("subcat", "ear"), "-")
+
+
+glimpse(monoaural_longer)
+
+monoaural_longer %>% 
+  ggplot() +
+  aes(x = ear, color = subcat, group = subcat, y = RT) +
+  stat_summary(fun.y = mean, geom = "point", size = 2.5) +
+  stat_summary(fun.y = mean, geom = "line", size = 1.5)+
+  scale_x_discrete(labels=c('Bal', 'Jobb'))+
+  scale_colour_discrete(name = "Kategória", labels=c('Értelmetlen', 'Metaforikus', 'Konkrét'), type=c("#BBDBD1", "#7E78D2", "#A7AAA4"))+
+  labs(title = "Reakcióidő nagysága a feltételek közt (Nincs interakció)", y= "Reakcióidő", x = "Füloldal")+
+  theme_minimal() + 
+  theme(axis.text.x = element_text(angle = 90),
+        plot.title=element_text(hjust = 0.5),
+        plot.background = element_rect(fill = "transparent", color = NA),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank())
+ggsave("../figures/001-interaction-plot.jpg",  width = 20, height = 20, units = "cm", dpi = 900)
+
+
+```
+
+```{r}
+anova_cond <-  monoaural_longer %>% 
+  mutate(subcat = factor(as.factor(subcat), levels = c("ertelmetlen", "mn", "szsz")),
+         ear = as.factor(ear))
+  
+
+anova_cond  %>%
+  group_by(subcat, ear) %>%
+  identify_outliers(RT) #no extreme outliers
+
+anova_cond %>%
+  group_by(subcat, ear) %>%
+  shapiro_test(RT) # rt is normally distributed in each condition (p > 0.05)
+
+ggqqplot(anova_cond, "RT", ggtheme = theme_bw()) +
+  facet_grid(subcat ~ ear, labeller = "label_both") # normality finee
+
+res.aov <- anova_test(
+  data = anova_cond, dv = RT, wid = Resztvevok,
+  within = c(subcat, ear)
+  )
+get_anova_table(res.aov) # subcat SIG. p = .005 F(2,40) = 6
+
+pwc <- anova_cond %>%
+  pairwise_t_test(
+    RT ~ subcat, paired = TRUE, 
+    p.adjust.method = "bonferroni"
+    ) %>% 
+  add_significance()
+pwc # ertelmetlen > mn, p = .006 and szsz < mn, p = .0002
+```
+
+
+```{r}
+pwc <- pwc %>% add_xy_position(x = "subcat")
+
+
+bxp <-  ggpaired(anova_cond, x = "subcat", y = "RT", fill = "subcat",
+                 line.color = "gray", line.size = 0.4)+
+  scale_fill_discrete(name = "Kategória", labels=c('Értelmetlen', 'Metaforikus', 'Konkrét'), type=c("#BBDBD1", "#7E78D2", "#A7AAA4"))+
+  labs(title = "Reakcióidő nagysága a kategóriák közt", y= "Reakcióidő", x = "Kategória")+
+  theme_minimal() + 
+  theme(axis.text.x = element_blank(),
+        plot.title=element_text(hjust = 0.5),
+        plot.background = element_rect(fill = "transparent", color = NA),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank())
+
+formatted_bxp <-bxp + stat_pvalue_manual(pwc, label = "p.adj.signif", tip.length = 0.01, y.position = c(2.1, 2.2, 2.3), bracket.shorten = 0.05)
+
+formatted_bxpp <- bxp +
+  stat_pvalue_manual(pwc, label = "{p}{p.adj.signif}", tip.length = 0.01, y.position = c(2.1, 2.2, 2.3), bracket.shorten = 0.05) +
+  scale_y_continuous(expand = expansion(mult = c(0.05, 0.10)))
+bxp
+formatted_bxp
+formatted_bxpp
+ggsave("../figures/001-category-effect-plot.jpg",  plot = formatted_bxp, width = 20, height = 20, units = "cm", dpi = 900)
+
+```
+
